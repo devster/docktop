@@ -1,0 +1,10 @@
+{
+    "name": "dockview",
+    "version": "0.0.1",
+    "private": true,
+    "dependencies": {
+        "merge": "~1.2",
+        "blessed": "~0.1.56",
+        "blessed-contrib": "*"
+    }
+}
