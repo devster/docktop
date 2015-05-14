@@ -1,8 +1,9 @@
-var Table = require('blessed-contrib').table,
+var Table = require('../widget/table'),
     merge = require('merge'),
     Node = require('blessed').Node,
     docker = require('../lib/docker'),
-    router = require('../panels/router');
+    router = require('../panels/router'),
+    screen = require('../panels/screen')
 
 function ListContainers(options)
 {
@@ -10,8 +11,8 @@ function ListContainers(options)
         keys: true,
         fg: 'green',
         columnSpacing:1,
-        columnWidth: [24, 24],
-        refresh: 2000
+        columnWidth: [14, 24, 18, 28],
+        refresh: 1000
     };
 
     if (!(this instanceof Node)) {
@@ -23,10 +24,14 @@ function ListContainers(options)
     this.updateLabel();
     this.interval;
     this.containers = [];
-    this.focused = false;
+    this.lastKey = ''
+    this.lastKeyHit
+
     this.rows.on('select', (function(item, i) {
         router.render('container_view', this.containers[i].container_id);
     }).bind(this));
+
+    this.focus()
 }
 
 ListContainers.prototype.__proto__ = Table.prototype;
@@ -49,21 +54,46 @@ ListContainers.prototype.start = function()
 
     this.loop();
     this.interval = setInterval(this.loop.bind(this), this.options.refresh);
+
+    screen.on('keypress', this.keypressListener.bind(this));
 }
 
-ListContainers.prototype.stop = function()
+ListContainers.prototype.keypressListener = function(ch, key)
+{
+    var ts = (new Date()).getTime()
+    var diff = ts - this.lastKeyHit;
+
+    if (diff < 900 && this.lastKey == 'd' && key.name == 'd') {
+        this.killSelectedContainer()
+    }
+
+    this.lastKey = key.name
+    this.lastKeyHit = ts
+}
+
+ListContainers.prototype.killSelectedContainer = function()
+{
+    var c = this.containers[this.rows.selected];
+    docker.kill(c.container_id, function() {
+        this.loop()
+    }.bind(this))
+}
+
+ListContainers.prototype.destroy = function()
 {
     if (this.interval) {
         clearInterval(this.interval);
     }
 
-    this.focused = false;
+    screen.off('keypress', this.keypressListener.bind(this))
+
+    Table.prototype.destroy.call(this)
 }
 
 ListContainers.prototype.loop = function()
 {
     var table = {
-        headers: ['ID', 'names']
+        headers: ['ID', 'Names', 'Status', 'Ports']
     };
 
     docker.ps((function(containers) {
@@ -73,13 +103,8 @@ ListContainers.prototype.loop = function()
 
         if (containers.length) {
             data = containers.map(function(c) {
-                return [c.container_id, c.names];
+                return [c.container_id, c.names, c.status, c.ports];
             });
-
-            if (!this.focused) {
-                this.focus();
-                this.focused = true;
-            }
         }
 
         this.updateLabel(containers.length);

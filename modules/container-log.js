@@ -1,14 +1,17 @@
 var merge = require('merge'),
-    Node = require('blessed').Node,
-    Log = require('blessed-contrib').log,
-    docker = require('../lib/docker');
+    blessed = require('blessed'),
+    Node = blessed.Node,
+    Text = blessed.Text,
+    docker = require('../lib/docker')
 
 function ContainerLog(options)
 {
     var defaults = {
         fg: "green",
-        selectedFg: "green",
-        refresh: 1000
+        refresh: 1000,
+        scrollable: true,
+        keys: true,
+        mouse: true
     };
 
     if (!(this instanceof Node)) {
@@ -16,30 +19,32 @@ function ContainerLog(options)
     }
 
     options = merge(defaults, options || {});
-    Log.call(this, options);
+    Text.call(this, options);
     this.interval;
+    this.container = options.container
 }
 
-ContainerLog.prototype.__proto__ = Log.prototype;
+ContainerLog.prototype.__proto__ = Text.prototype;
 
-ContainerLog.prototype.start = function(container)
+ContainerLog.prototype.start = function()
 {
     if (this.interval) {
         console.error('Instance of '+this.constructor.name+' already started');
         process.exit(1);
     }
 
-    this.setLabel('Logs '+container.Name+' ('+container.shortId+')');
-    this.container = container;
+    this.setLabel('Logs '+this.container.name()+' ('+this.container.shortId()+')');
     this.loop();
     this.interval = setInterval(this.loop.bind(this), this.options.refresh);
 }
 
-ContainerLog.prototype.stop = function()
+ContainerLog.prototype.destroy = function()
 {
     if (this.interval) {
         clearInterval(this.interval);
     }
+
+    Text.prototype.destroy.call(this)
 }
 
 ContainerLog.prototype.loop = function()
@@ -58,24 +63,18 @@ ContainerLog.prototype.loop = function()
         return arr;
     }
 
-
-    docker.logs(this.container.Id, (function(lines) {
+    docker.logs(this.container.Name, (function(lines) {
         var items = lines.reduce(function(arr, line) {
             return arr.concat(split(line));
         }, []);
 
-        this.setItems(items);
-        this.scrollTo(lines.length);
+        var content = items.join('\n')
+
+        if (this.getContent() != content) {
+            this.setContent(items.join('\n'))
+            this.scrollTo(items.length)
+        }
     }).bind(this));
-
-
-    // var output = docker.logs(this.containerId);
-    // var lines = output.toString().split('\n');
-    // for (var i = 0; i < lines.length; i++) {
-    //     this.log(lines[i]);
-    // }
-
-    // this.log(this.containerId+' Coucou la famille, si si '+ Math.random());
 }
 
 module.exports = ContainerLog;

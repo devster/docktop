@@ -4,17 +4,22 @@ var docker = require('./lib/docker'),
     dashboard = require('./panels/dashboard'),
     containerView = require('./panels/container-view');
 
+require('./lib/utils');
+
 docker.test(function (err) {
-    console.error('Unable to run docker');
-    throw err;
-    process.exit(2);
+    console.log('wtf')
+    if (err) {
+        console.error('Unable to run docker');
+        throw err;
+        process.exit(2);
+    }
+
+    setInterval(function() {
+        screen.render();
+    }, 500);
+
+    router.addView('dashboard', dashboard);
+    router.addView('container_view', containerView);
+
+    router.render('dashboard');
 });
-
-setInterval(function() {
-    screen.render();
-}, 500);
-
-router.addView('dashboard', dashboard);
-router.addView('container_view', containerView);
-
-router.render('dashboard');
